@@ -1,265 +1,144 @@
 <!DOCTYPE html>
-
 <html lang="id">
-
 <head>
-
     <meta charset="UTF-8">
-
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>Katalog Digital Pencarian Cepat</title>
-
+    <!-- Tailwind CSS v4 CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-
+    <!-- Fuse.js untuk Fuzzy Search -->
     <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
-
     <style>
-
-        /* Mencegah gambar rusak/pecah merusak layout */
-
         .img-container img { object-fit: cover; width: 100%; height: 100%; }
-
     </style>
-
 </head>
-
-<body class="bg-gray-50 text-gray-800 font-sans">
-
-
+<body class="bg-gray-50 text-gray-800 font-sans min-h-screen flex flex-col">
 
     <header class="bg-white shadow-sm sticky top-0 z-50 py-6 px-4">
-
         <div class="max-w-4xl mx-auto text-center">
-
-            <h1 class="text-2xl font-bold text-gray-900 mb-2">CATALOG DIGITAL PANCARAN GROUP </h1>
-
+            <h1 class="text-2xl font-bold text-gray-900 mb-2">CATALOG DIGITAL PANCARAN GROUP</h1>
             <p class="text-sm text-gray-500 mb-4">Cari berdasarkan Nama Barang atau Kode Search Key/SKU secara instan</p>
-
             
-
             <div class="relative max-w-xl mx-auto">
-
                 <input type="text" id="searchInput" oninput="searchProduct()" placeholder="Ketik nama barang atau Search Key / SKU di sini..." 
-
-                    class="w-full pl-5 pr-12 py-3 border-2 border-gray-300 rounded-full shadow-inner focus:outline-none focus:border-blue-500 text-lg transition">
-
+                    class="w-full pl-5 pr-12 py-3 border-2 border-gray-300 rounded-full shadow-inner focus:outline-none focus:border-blue-500 text-base transition">
                 <span class="absolute right-4 top-3.5 text-gray-400">🔍</span>
-
             </div>
-
             <div id="statusText" class="text-xs text-blue-600 mt-2 font-medium">Memuat database produk...</div>
-
         </div>
-
     </header>
 
-
-
-    <main class="max-w-6xl mx-auto px-4 py-8">
-
+    <main class="max-w-6xl mx-auto px-4 py-8 flex-grow w-full">
         <div id="catalogGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-
-            </div>
-
+            <!-- Produk akan di-render di sini -->
+        </div>
     </main>
 
-
+    <footer class="text-center py-4 text-xs text-gray-400 border-t border-gray-200">
+        &copy; Catalog Digital Pancaran Group
+    </footer>
 
     <script>
-
-        // GANTI ID DI BAWAH INI DENGAN ID GOOGLE SHEETS ANDA
-
         const SPREADSHEET_ID = '1o7QXSLphqQ_cY69UZj5dI2Sj3maNfIrWvyrp38WFsGo';
-
-        const SHEET_NAME = 'Catalog Product'; // Sesuaikan nama sheet Anda jika diganti
-
+        const SHEET_NAME = 'Catalog Product'; 
         
-
-        const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=${SHEET_NAME}`;
-
+        const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(SHEET_NAME)}`;
         
-
         let allProducts = [];
-
         let fuse;
 
-
-
-        // Ambil Data dari Google Sheets secara gratis
-
+        // Ambil Data dari Google Sheets
         fetch(url)
-
             .then(res => res.text())
-
             .then(data => {
-
-                // Bersihkan response format Google JSON
-
-                const json = JSON.parse(data.substr(47).slice(0, -2));
-
-                const rows = json.table.rows;
-
+                // Memberikan penanganan ekstra jika format JSON dari GViz bergeser
+                const rawJsonStr = data.substring(data.indexOf('{'), data.lastIndexOf('}') + 1);
+                const json = JSON.parse(rawJsonStr);
+                const rows = json.table.rows || [];
                 
+                allProducts = rows
+                    .filter(row => row.c && row.c[0] && row.c[0].v !== null) // Pastikan kolom nama ada
+                    .map(row => {
+                        const nama = row.c[0] ? String(row.c[0].v) : '';
+                        const sku = row.c[1] ? String(row.c[1].v) : '-';
+                        const rawUrl = row.c[2] ? String(row.c[2].v) : '';
 
-                // Memfilter baris judul/header terlebih dahulu, kemudian melakukan mapping data tabel ke Array JavaScript
+                        // Mengambil ID Google Drive menggunakan Regex agar lebih robust
+                        let driveId = '';
+                        const matchId = rawUrl.match(/(?:id=|\/d\/)([\w-]+)/);
+                        if (matchId && matchId[1]) {
+                            driveId = matchId[1];
+                        }
 
-allProducts = rows
+                        // Menggunakan endpoint LH3 yang stabil untuk preview gambar Drive
+                        const foto = driveId 
+                            ? `https://lh3.googleusercontent.com/d/${driveId}` 
+                            : 'https://via.placeholder.com/200x200?text=No+Image';
 
-  .filter(row => row.c[0] && row.c[0].v !== 'nama') // baris ini otomatis membuang baris "nama" & "sku"
+                        return { nama, sku, foto };
+                    })
+                    // Membuang baris header jika nama baris adalah 'nama' atau 'nama barang'
+                    .filter(p => p.nama.toLowerCase() !== 'nama' && p.nama.toLowerCase() !== 'nama barang');
 
-  .map(row => {
-
-    // Mengambil ID unik foto dari tautan Google Drive
-
-    let driveId = '';
-
-    if (row.c[2] && row.c[2].v) {
-
-        const rawUrl = row.c[2].v;
-
-        if (rawUrl.includes('id=')) {
-
-            driveId = rawUrl.split('id=')[1].split('&')[0];
-
-        } else if (rawUrl.includes('/d/')) {
-
-            driveId = rawUrl.split('/d/')[1].split('/')[0];
-
-        }
-
-    }
-
-
-
-    return {
-
-        nama: row.c[0] ? row.c[0].v : '',
-
-        sku: row.c[1] ? row.c[1].v : '',
-
-        // Menggunakan domain HTTPS dan sub-domain LH3 resmi milik Google untuk gambar
-
-        foto: driveId ? `https://lh3.googleusercontent.com/d/${driveId}` : 'https://via.placeholder.com/150?text=No+Image'
-
-    };
-
-  });
-
-                // Inisialisasi Fuse.js untuk pencarian pintar (fuzzy search)
-
+                // Inisialisasi Fuse.js
                 fuse = new Fuse(allProducts, {
-
                     keys: ['nama', 'sku'],
-
-                    threshold: 0.3 // Toleransi salah ketik kecil
-
+                    threshold: 0.3,
+                    ignoreLocation: true
                 });
 
-
-
                 document.getElementById('statusText').innerText = `${allProducts.length} Produk siap dicari.`;
-
-                displayProducts(allProducts.slice(0, 10)); // Tampilkan 50 produk pertama dulu agar web ringan
-
+                displayProducts(allProducts.slice(0, 20)); // Tampilkan 20 pertama saat awal dimuat
             })
-
             .catch(err => {
-
-                document.getElementById('statusText').innerText = "Gagal memuat database. Periksa ID Google Sheets Anda.";
-
-                console.error(err);
-
+                document.getElementById('statusText').innerText = "Gagal memuat database. Periksa izin Google Sheets Anda (harus 'Anyone with the link').";
+                console.error("Detail Error:", err);
             });
-
-
 
         // Fungsi Menampilkan Produk ke Layar
-
         function displayProducts(products) {
-
             const grid = document.getElementById('catalogGrid');
-
-            grid.innerHTML = '';
-
             
-
             if (products.length === 0) {
-
                 grid.innerHTML = `<div class="col-span-full text-center py-12 text-gray-400">Produk tidak ditemukan.</div>`;
-
                 return;
-
             }
 
-
-
-            products.forEach(p => {
-
-                const card = `
-
-                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition p-3 flex flex-col justify-between">
-
+            // Gabungkan HTML string sekaligus untuk performa render DOM yang jauh lebih cepat
+            grid.innerHTML = products.map(p => `
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition p-3 flex flex-col justify-between">
+                    <div>
                         <div class="w-full aspect-square bg-gray-100 rounded mb-3 overflow-hidden img-container">
-
-                            <img src="${p.foto}" alt="${p.nama}" loading="lazy">
-
+                            <img src="${p.foto}" 
+                                 alt="${p.nama}" 
+                                 loading="lazy"
+                                 onerror="this.onerror=null;this.src='https://via.placeholder.com/200x200?text=Error+Gambar';">
                         </div>
-
-                        <div>
-
-                            <h3 class="text-sm font-semibold text-gray-800 line-clamp-2 mb-1" title="${p.nama}">${p.nama}</h3>
-
-                            <p class="text-xs font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded inline-block">SKU: ${p.sku}</p>
-
-                        </div>
-
+                        <h3 class="text-sm font-semibold text-gray-800 line-clamp-2 mb-1" title="${p.nama}">${p.nama}</h3>
                     </div>
-
-                `;
-
-                grid.innerHTML += card;
-
-            });
-
+                    <div class="mt-2">
+                        <p class="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-1 rounded inline-block">SKU: ${p.sku}</p>
+                    </div>
+                </div>
+            `).join('');
         }
-
-
 
         // Fungsi Fitur Pencarian Real-Time
-
         function searchProduct() {
-
-            const query = document.getElementById('searchInput').value;
-
+            const query = document.getElementById('searchInput').value.trim();
             
-
-            if (!query.trim()) {
-
+            if (!query) {
                 document.getElementById('statusText').innerText = `${allProducts.length} Produk siap dicari.`;
-
-                displayProducts(allProducts.slice(0, 10)); // jika kosong, balikkan ke 50 pertama
-
+                displayProducts(allProducts.slice(0, 20));
                 return;
-
             }
 
-
-
             const result = fuse.search(query);
-
             const filteredProducts = result.map(res => res.item);
-
             
-
             document.getElementById('statusText').innerText = `Ditemukan ${filteredProducts.length} produk sesuai.`;
-
             displayProducts(filteredProducts);
-
         }
-
     </script>
-
 </body>
-
 </html>
