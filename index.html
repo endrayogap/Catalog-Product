@@ -17,10 +17,10 @@
     <header class="bg-white shadow-sm sticky top-0 z-50 py-6 px-4">
         <div class="max-w-4xl mx-auto text-center">
             <h1 class="text-2xl font-bold text-gray-900 mb-2">CATALOG DIGITAL PANCARAN GROUP</h1>
-            <p class="text-sm text-gray-500 mb-4">Cari berdasarkan Nama Barang atau Kode Search Key/SKU secara instan</p>
+            <p class="text-sm text-gray-500 mb-4">Cari berdasarkan Nama Barang / Nama Lain secara instan</p>
             
             <div class="relative max-w-xl mx-auto">
-                <input type="text" id="searchInput" oninput="searchProduct()" placeholder="Ketik nama barang atau Search Key / SKU di sini..." 
+                <input type="text" id="searchInput" oninput="searchProduct()" placeholder="Ketik Nama Barang / Nama Lain di sini..." 
                     class="w-full pl-5 pr-12 py-3 border-2 border-gray-300 rounded-full shadow-inner focus:outline-none focus:border-blue-500 text-base transition">
                 <span class="absolute right-4 top-3.5 text-gray-400">🔍</span>
             </div>
@@ -60,7 +60,7 @@
                     .filter(row => row.c && row.c[0] && row.c[0].v !== null) // Pastikan kolom nama ada
                     .map(row => {
                         const nama = row.c[0] ? String(row.c[0].v) : '';
-                        const sku = row.c[1] ? String(row.c[1].v) : '-';
+                        const namalain = row.c[1] ? String(row.c[1].v) : '-';
                         const rawUrl = row.c[2] ? String(row.c[2].v) : '';
 
                         // Mengambil ID Google Drive menggunakan Regex agar lebih robust
@@ -75,14 +75,14 @@
                             ? `https://lh3.googleusercontent.com/d/${driveId}` 
                             : 'https://via.placeholder.com/200x200?text=No+Image';
 
-                        return { nama, sku, foto };
+                        return { nama, namalain, foto };
                     })
                     // Membuang baris header jika nama baris adalah 'nama' atau 'nama barang'
                     .filter(p => p.nama.toLowerCase() !== 'nama' && p.nama.toLowerCase() !== 'nama barang');
 
                 // Inisialisasi Fuse.js
                 fuse = new Fuse(allProducts, {
-                    keys: ['nama', 'sku'],
+                    keys: ['nama', 'namalain'],
                     threshold: 0.3,
                     ignoreLocation: true
                 });
@@ -117,7 +117,7 @@
                         <h3 class="text-sm font-semibold text-gray-800 line-clamp-2 mb-1" title="${p.nama}">${p.nama}</h3>
                     </div>
                     <div class="mt-2">
-                        <p class="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-1 rounded inline-block">SKU: ${p.sku}</p>
+                        <p class="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-1 rounded inline-block">NAMALAIN: ${p.namalain}</p>
                     </div>
                 </div>
             `).join('');
